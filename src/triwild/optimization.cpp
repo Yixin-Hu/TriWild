@@ -742,6 +742,169 @@ void triwild::optimization::erase_holes(MeshData &mesh, const std::vector<GEO::v
     }
 }
 
+void triwild::optimization::extract_feature_polygons(const MeshData& mesh, const std::string& hole_file, std::string& out_file) {
+    //
+    std::vector<GEO::vec3> ps;
+    std::ifstream fin(hole_file);
+    if (fin.is_open()) {
+        double x, y;
+        while (fin >> x >> y) {
+            ps.push_back(GEO::vec3(x, y, 0));
+        }
+        fin.close();
+    } else
+        return;
+
+    //construct aabb tree
+    GEO::Mesh f_mesh;
+    f_mesh.vertices.clear();
+    int cnt = std::count(mesh.v_is_removed.begin(), mesh.v_is_removed.end(), false);
+    f_mesh.vertices.create_vertices(cnt);
+    std::unordered_map<int, int> map_v_ids;
+    cnt = 0;
+    for (int i = 0; i < mesh.tri_vertices.size(); i++) {
+        if (mesh.v_is_removed[i])
+            continue;
+        GEO::vec3 &p = f_mesh.vertices.point(cnt);
+        p[0] = mesh.tri_vertices[i].posf[0];
+        p[1] = mesh.tri_vertices[i].posf[1];
+        p[2] = 0;
+        map_v_ids[i] = cnt;
+        cnt++;
+    }
+
+    f_mesh.facets.clear();
+    cnt = std::count(mesh.t_is_removed.begin(), mesh.t_is_removed.end(), false);
+    f_mesh.facets.create_triangles(cnt);
+    cnt = 0;
+    std::unordered_map<int, int> inv_map_f_ids;
+    for (int i = 0; i < mesh.tris.size(); i++) {
+        if (mesh.t_is_removed[i])
+            continue;
+        f_mesh.facets.set_vertex(cnt, 0, map_v_ids[mesh.tris[i][0]]);
+        f_mesh.facets.set_vertex(cnt, 1, map_v_ids[mesh.tris[i][1]]);
+        f_mesh.facets.set_vertex(cnt, 2, map_v_ids[mesh.tris[i][2]]);
+        inv_map_f_ids[cnt] = i;
+        cnt++;
+    }
+    f_mesh.facets.compute_borders();
+    GEO::MeshFacetsAABB f_tree(f_mesh, false);
+
+    //
+    std::vector<std::vector<std::array<int, 4>>> feature_polygons;
+    for (auto &p:ps) {
+        std::vector<bool> is_visited(mesh.tris.size(), false);
+        GEO::vec3 _p;
+        double _d;
+        std::queue<int> t_queue;
+        //
+        int t_id = inv_map_f_ids[f_tree.nearest_facet(p, _p, _d)];
+        t_queue.push(t_id);
+        is_visited[t_id] = true;
+        //
+        feature_polygons.emplace_back();
+        auto &b_edges = feature_polygons.back();
+        while (!t_queue.empty()) {
+            int t_id = t_queue.front();
+            t_queue.pop();
+
+            for (int j = 0; j < 3; j++) {
+                if (mesh.is_bbox_es[t_id][j])
+                    continue;
+                if (mesh.tag_feature_es[t_id][j] >= 0) {
+                    if (mesh.tri_nodes[t_id].empty())
+                        b_edges.push_back({{mesh.tris[t_id][(j + 1) % 3], mesh.tris[t_id][(j + 2) % 3], -1, -1}});
+                    else
+                        b_edges.push_back({{mesh.tris[t_id][(j + 1) % 3], mesh.tris[t_id][(j + 2) % 3],
+                                                   mesh.tri_nodes[t_id][j * 2], mesh.tri_nodes[t_id][j * 2 + 1]}});
+                    continue;
+                }
+                if (mesh.tag_secondary_feature_es[t_id][j] >= 0) {
+                    b_edges.push_back({{mesh.tris[t_id][(j + 1) % 3], mesh.tris[t_id][(j + 2) % 3], -1, -1}});
+                    continue;
+                }
+//                if (mesh.is_boundary_es[t_id][j]) {
+//                    if (mesh.tri_nodes[t_id].empty()) {
+//                        b_edges.push_back({{mesh.tris[t_id][(j + 1) % 3], mesh.tris[t_id][(j + 2) % 3], -1, -1}});
+//                        cout<<"se"<<endl;
+//                    } else
+//                        b_edges.push_back({{mesh.tris[t_id][(j + 1) % 3], mesh.tris[t_id][(j + 2) % 3],
+//                                                   mesh.tri_nodes[t_id][j * 2], mesh.tri_nodes[t_id][j * 2 + 1]}});
+//                    continue;
+//                }
+
+                int v1_id = mesh.tris[t_id][(j + 1) % 3];
+                int v2_id = mesh.tris[t_id][(j + 2) % 3];
+                std::vector<int> tmp = set_intersection(mesh.tri_vertices[v1_id].conn_tris,
+                                                        mesh.tri_vertices[v2_id].conn_tris);
+                if (tmp.size() < 2)
+                    continue;
+
+                int n_t_id = tmp[0] == t_id ? tmp[1] : tmp[0];
+                if (is_visited[n_t_id])
+                    continue;
+                is_visited[n_t_id] = true;
+                t_queue.push(n_t_id);
+            }
+        }
+        //
+        //connect b_edges
+        //todo
+        //
+    }
+
+    //output
+    std::ofstream fout(out_file);
+    //
+    std::vector<int> v_ids;
+    std::vector<int> n_ids;
+    for (auto &poly: feature_polygons) {
+        for (auto &ns: poly) {
+            v_ids.push_back(ns[0]);
+            v_ids.push_back(ns[1]);
+            if (ns[2] >= 0) {
+                n_ids.push_back(ns[2]);
+                n_ids.push_back(ns[3]);
+            }
+        }
+    }
+    vector_unique(v_ids);
+    vector_unique(n_ids);
+    //
+    std::map<int, int> map_vs;
+    std::map<int, int> map_ns;
+    for (int i = 0; i < v_ids.size(); i++) {
+        map_vs[v_ids[i]] = i;
+        fout << "p " << mesh.tri_vertices[v_ids[i]].posf[0] << " " << mesh.tri_vertices[v_ids[i]].posf[1] << " "
+             << mesh.tri_vertices[v_ids[i]].posf[2] << endl;
+    }
+    for (int i = 0; i < n_ids.size(); i++) {
+        map_ns[n_ids[i]] = v_ids.size() + i;
+        fout << "p " << mesh.nodes[n_ids[i]][0] << " " << mesh.nodes[n_ids[i]][1] << " "
+             << mesh.nodes[n_ids[i]][2] << endl;
+    }
+    //
+    for (auto &poly: feature_polygons) {
+        for (auto &ns: poly) {
+            if (ns[2] >= 0) {
+                fout << "c " << map_vs[ns[0]] << " " << map_ns[ns[2]] << " " << map_ns[ns[3]] << " " << map_vs[ns[1]]
+                     << endl;
+            } else {
+                fout << "c " << map_vs[ns[0]] << " " << map_vs[ns[1]] << endl;
+            }
+        }
+    }
+    cnt = 0;
+    for (auto &b_edges: feature_polygons) {
+        fout << "poly ";
+        for (int i = 0; i < b_edges.size(); i++)
+            fout << cnt + i << " ";
+        fout << endl;
+        cnt += b_edges.size();
+    }
+    fout.close();
+}
+
 #include <igl/readSTL.h>
 #include <igl/writeSTL.h>
 #include "../../extern/pymesh/MshSaver.h"

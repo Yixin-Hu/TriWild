@@ -110,6 +110,9 @@ namespace triwild {
                 return e1.weight < e2.weight;///choose larger edge for removal
             }
         };
+
+
+        void extract_feature_polygons(const MeshData& mesh, const std::string& hole_file, std::string& out_file);
     }
 }
 

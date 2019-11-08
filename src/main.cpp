@@ -46,6 +46,11 @@ int main(int argc, char* argv[]) {
 
     app.add_flag("--output-linear-mesh", args.output_linear, "Output linear mesh for curved pipeline.");
 
+    std::string feature_outfile = "";
+    std::string feature_hole_file = "";
+    app.add_option("--extract-feature", feature_outfile, "");
+    app.add_option("--holes", feature_hole_file, "");
+
     try {
         app.parse(argc, argv);
     }
@@ -206,6 +211,10 @@ int main(int argc, char* argv[]) {
     curving_time = t;
     cout << "Curving done." << endl;
     cout << "time = " << t << "s" << endl;
+
+    if(feature_outfile!="" && feature_hole_file!=""){
+        optimization::extract_feature_polygons(mesh, feature_hole_file, feature_outfile);
+    }
 
     igl_timer.start();
     if (cut_outside)
