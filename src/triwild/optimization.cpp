@@ -816,7 +816,8 @@ void triwild::optimization::extract_feature_polygons(const MeshData& mesh, const
                         b_edges.push_back({{mesh.tris[t_id][(j + 1) % 3], mesh.tris[t_id][(j + 2) % 3], -1, -1}});
                     else
                         b_edges.push_back({{mesh.tris[t_id][(j + 1) % 3], mesh.tris[t_id][(j + 2) % 3],
-                                                   mesh.tri_nodes[t_id][j * 2], mesh.tri_nodes[t_id][j * 2 + 1]}});
+                                                   mesh.tri_nodes[t_id][((j + 1) % 3) * 2],
+                                                   mesh.tri_nodes[t_id][((j + 1) % 3) * 2 + 1]}});
                     continue;
                 }
                 if (mesh.tag_secondary_feature_es[t_id][j] >= 0) {
@@ -849,8 +850,8 @@ void triwild::optimization::extract_feature_polygons(const MeshData& mesh, const
         }
         //
         //connect b_edges
-        //todo
-        //
+        std::vector<std::vector<int>> conn_es;
+
     }
 
     //output
@@ -875,13 +876,11 @@ void triwild::optimization::extract_feature_polygons(const MeshData& mesh, const
     std::map<int, int> map_ns;
     for (int i = 0; i < v_ids.size(); i++) {
         map_vs[v_ids[i]] = i;
-        fout << "p " << mesh.tri_vertices[v_ids[i]].posf[0] << " " << mesh.tri_vertices[v_ids[i]].posf[1] << " "
-             << mesh.tri_vertices[v_ids[i]].posf[2] << endl;
+        fout << "p " << mesh.tri_vertices[v_ids[i]].posf[0] << " " << mesh.tri_vertices[v_ids[i]].posf[1] << endl;
     }
     for (int i = 0; i < n_ids.size(); i++) {
         map_ns[n_ids[i]] = v_ids.size() + i;
-        fout << "p " << mesh.nodes[n_ids[i]][0] << " " << mesh.nodes[n_ids[i]][1] << " "
-             << mesh.nodes[n_ids[i]][2] << endl;
+        fout << "p " << mesh.nodes[n_ids[i]][0] << " " << mesh.nodes[n_ids[i]][1] << endl;
     }
     //
     for (auto &poly: feature_polygons) {
