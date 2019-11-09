@@ -742,14 +742,17 @@ void triwild::optimization::erase_holes(MeshData &mesh, const std::vector<GEO::v
     }
 }
 
-void triwild::optimization::extract_feature_polygons(const MeshData& mesh, const std::string& hole_file, std::string& out_file) {
+#include <geogram/delaunay/delaunay_3d.h>
+void triwild::optimization::extract_feature_polygons(const MeshData& mesh,
+        const std::string& hole_file, std::string& out_file) {
     //
-    std::vector<GEO::vec3> ps;
+    std::vector<std::pair<GEO::vec3,int>> ps_info;
     std::ifstream fin(hole_file);
     if (fin.is_open()) {
         double x, y;
-        while (fin >> x >> y) {
-            ps.push_back(GEO::vec3(x, y, 0));
+        int ori;
+        while (fin >> x >> y >> ori) {
+            ps_info.push_back(std::make_pair(GEO::vec3(x, y, 0), ori));
         }
         fin.close();
     } else
@@ -792,7 +795,10 @@ void triwild::optimization::extract_feature_polygons(const MeshData& mesh, const
 
     //
     std::vector<std::vector<std::array<int, 4>>> feature_polygons;
-    for (auto &p:ps) {
+    for (auto &info:ps_info) {
+        auto& p = info.first;
+        int ori = info.second;
+
         std::vector<bool> is_visited(mesh.tris.size(), false);
         GEO::vec3 _p;
         double _d;
@@ -802,8 +808,7 @@ void triwild::optimization::extract_feature_polygons(const MeshData& mesh, const
         t_queue.push(t_id);
         is_visited[t_id] = true;
         //
-        feature_polygons.emplace_back();
-        auto &b_edges = feature_polygons.back();
+        std::vector<std::array<int, 4>> b_edges;
         while (!t_queue.empty()) {
             int t_id = t_queue.front();
             t_queue.pop();
@@ -824,15 +829,6 @@ void triwild::optimization::extract_feature_polygons(const MeshData& mesh, const
                     b_edges.push_back({{mesh.tris[t_id][(j + 1) % 3], mesh.tris[t_id][(j + 2) % 3], -1, -1}});
                     continue;
                 }
-//                if (mesh.is_boundary_es[t_id][j]) {
-//                    if (mesh.tri_nodes[t_id].empty()) {
-//                        b_edges.push_back({{mesh.tris[t_id][(j + 1) % 3], mesh.tris[t_id][(j + 2) % 3], -1, -1}});
-//                        cout<<"se"<<endl;
-//                    } else
-//                        b_edges.push_back({{mesh.tris[t_id][(j + 1) % 3], mesh.tris[t_id][(j + 2) % 3],
-//                                                   mesh.tri_nodes[t_id][j * 2], mesh.tri_nodes[t_id][j * 2 + 1]}});
-//                    continue;
-//                }
 
                 int v1_id = mesh.tris[t_id][(j + 1) % 3];
                 int v2_id = mesh.tris[t_id][(j + 2) % 3];
@@ -849,9 +845,69 @@ void triwild::optimization::extract_feature_polygons(const MeshData& mesh, const
             }
         }
         //
-        //connect b_edges
-        std::vector<std::vector<int>> conn_es;
-
+        //orient b_edges
+        std::map<int, std::vector<int>> conn_es;
+        for (int i = 0; i < b_edges.size(); i++) {
+            for (int j = 0; j < 2; j++)
+                conn_es[b_edges[i][j]].push_back(i);
+        }
+        std::vector<int> orient_e_ids = {0};
+        int head = b_edges.front()[0];
+        int tail = b_edges.front()[1];
+        bool is_non_manifold = false;
+        while (true) {
+            if (conn_es[tail].size() != 2) {
+                is_non_manifold = true;
+                break;
+            }
+            int old_e_id = orient_e_ids.back();
+            int e_id;
+            for (int id: conn_es[tail]) {
+                if (id != old_e_id) {
+                    e_id = id;
+                    break;
+                }
+            }
+            if (b_edges[e_id][1] == tail) {
+                std::swap(b_edges[0], b_edges[1]);
+                std::swap(b_edges[2], b_edges[3]);
+            }
+            tail = b_edges[e_id][1];
+            if (tail == head)
+                break;
+            orient_e_ids.push_back(e_id);
+        }
+        if (is_non_manifold)
+            continue;
+        //clockwise
+        auto orient_2d = [](const Point_2f& p1, const Point_2f& p2, const Point_2f& p){
+            double P1[2] = {p1.x, p1.y};
+            double P2[2] = {p2.x, p2.y};
+            double P[2] = {p.x, p.y};
+            GEO::Sign result = GEO::PCK::orient_2d(P1, P2, P);
+            if(result == GEO::NEGATIVE)
+                return -1;
+            else if (result == GEO::POSITIVE)
+                return 1;
+            else
+                return 0;
+        };
+        if(orient_2d(mesh.tri_vertices[b_edges[orient_e_ids.front()][0]].posf,
+                mesh.tri_vertices[b_edges[orient_e_ids.front()][1]].posf,
+                Point_2f(p[0], p[1]))!=ori){
+            std::reverse(orient_e_ids.begin(), orient_e_ids.end());
+            for(int e_id: orient_e_ids){
+                std::swap(b_edges[e_id][0], b_edges[e_id][1]);
+                std::swap(b_edges[e_id][2], b_edges[e_id][3]);
+            }
+        }
+        //
+        feature_polygons.emplace_back();
+        auto &oriented_b_edges = feature_polygons.back();
+        oriented_b_edges.resize(orient_e_ids.size());
+        for (int i = 0; i < orient_e_ids.size(); i++) {
+            oriented_b_edges[i] = b_edges[orient_e_ids[i]];
+        }
     }
 
     //output
