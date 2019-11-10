@@ -1,5 +1,6 @@
 import numpy as np
-path = 'test.fea'
+import sys
+path = sys.argv[1]
 
 
 points = []

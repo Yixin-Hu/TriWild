@@ -13,3 +13,5 @@ extern/aabbcc/
 extern/geogram/
 extern/libigl/
 extern/nlopt/
+
+python/*eps

@@ -755,8 +755,10 @@ void triwild::optimization::extract_feature_polygons(const MeshData& mesh,
             ps_info.push_back(std::make_pair(GEO::vec3(x, y, 0), ori));
         }
         fin.close();
-    } else
+    } else {
+        cout << "Cannot open " << hole_file << endl;
         return;
+    }
 
     //construct aabb tree
     GEO::Mesh f_mesh;
@@ -873,9 +875,9 @@ void triwild::optimization::extract_feature_polygons(const MeshData& mesh,
                 std::swap(b_edges[2], b_edges[3]);
             }
             tail = b_edges[e_id][1];
+            orient_e_ids.push_back(e_id);
             if (tail == head)
                 break;
-            orient_e_ids.push_back(e_id);
         }
         if (is_non_manifold)
             continue;
@@ -912,6 +914,7 @@ void triwild::optimization::extract_feature_polygons(const MeshData& mesh,
 
     //output
     std::ofstream fout(out_file);
+    cout<<"output features to "<<out_file<<endl;
     //
     std::vector<int> v_ids;
     std::vector<int> n_ids;
