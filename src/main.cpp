@@ -183,6 +183,13 @@ int main(int argc, char* argv[]) {
 
     ///////////////////
     if (!args.is_preserving_feature) {
+        igl_timer.start();
+        if (cut_outside) {
+            optimization::erase_outside(mesh);
+        }
+        if (hole_file != "")
+            optimization::erase_holes(mesh, hole_file);
+        cut_and_hole_time = igl_timer.getElapsedTime();
         optimization::output_mesh(mesh);
 
         if (args.log_file != "") {
@@ -217,8 +224,9 @@ int main(int argc, char* argv[]) {
     }
 
     igl_timer.start();
-    if (cut_outside)
+    if (cut_outside) {
         optimization::erase_outside(mesh);
+    }
     if (hole_file != "")
         optimization::erase_holes(mesh, hole_file);
     cut_and_hole_time = igl_timer.getElapsedTime();

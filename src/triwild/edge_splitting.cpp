@@ -41,7 +41,7 @@ void triwild::optimization::edge_splitting(MeshData &mesh) {
     if (mesh.is_edge_length_achieved || queue_l.top().weight >= mesh.ideal_edge_length)
         mesh.is_edge_length_achieved = true;
 
-    bool is_push_new_edges = true;
+    bool is_push_new_edges = false;
     while (!queue_l.empty()) {
         const ElementInQueue_l &ele = queue_l.top();
         ////split an edge
