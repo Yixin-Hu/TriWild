@@ -871,8 +871,8 @@ void triwild::optimization::extract_feature_polygons(const MeshData& mesh,
                 }
             }
             if (b_edges[e_id][1] == tail) {
-                std::swap(b_edges[0], b_edges[1]);
-                std::swap(b_edges[2], b_edges[3]);
+                std::swap(b_edges[e_id][0], b_edges[e_id][1]);
+                std::swap(b_edges[e_id][2], b_edges[e_id][3]);
             }
             tail = b_edges[e_id][1];
             orient_e_ids.push_back(e_id);
