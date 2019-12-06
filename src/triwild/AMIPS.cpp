@@ -39,9 +39,9 @@ double triwild::optimization::AMIPS_energy(const std::array<double, 6>& T){
     double helper_4 = helper_0[3];
     double helper_5 = helper_0[5];
     double helper_6 = helper_0[4];
-    double helper_7 = 5.0e-7*helper_6;
-    double helper_8 = 5.0e-7*helper_5;
-    return -2.0*(helper_1*(-0.25000025*helper_1 + 0.24999975*helper_2 + helper_7) + helper_2*(0.24999975*helper_1 - 0.25000025*helper_2 + helper_7) + helper_3*(-0.25000025*helper_3 + 0.24999975*helper_4 + helper_8) + helper_4*(0.24999975*helper_3 - 0.25000025*helper_4 + helper_8) + helper_5*(5.0e-7*helper_3 + 5.0e-7*helper_4 - 1.0e-6*helper_5) + helper_6*(5.0e-7*helper_1 + 5.0e-7*helper_2 - 1.0e-6*helper_6))/((helper_1 - helper_2)*(0.0005*helper_3 + 0.0005*helper_4 - 0.001*helper_5) - (helper_3 - helper_4)*(0.0005*helper_1 + 0.0005*helper_2 - 0.001*helper_6));
+    double helper_7 = 0.666666666666667*helper_5;
+    double helper_8 = 666.666666666667*helper_6;
+    return -(1000*helper_1*(-1333.33333333333*helper_1 + 666.666666666667*helper_2 + helper_8) + 1000*helper_2*(666.666666666667*helper_1 - 1333.33333333333*helper_2 + helper_8) + helper_3*(-1.33333333333333*helper_3 + 0.666666666666667*helper_4 + helper_7) + helper_4*(0.666666666666667*helper_3 - 1.33333333333333*helper_4 + helper_7) + helper_5*(0.666666666666667*helper_3 + 0.666666666666667*helper_4 - 1.33333333333333*helper_5) + 1000*helper_6*(666.666666666667*helper_1 + 666.666666666667*helper_2 - 1333.33333333333*helper_6))/(1000*(helper_1 - helper_2)*(0.577350269189626*helper_3 + 0.577350269189626*helper_4 - 1.15470053837925*helper_5) - (helper_3 - helper_4)*(577.350269189626*helper_1 + 577.350269189626*helper_2 - 1154.70053837925*helper_6));
 
 }
 
@@ -80,12 +80,14 @@ void triwild::optimization::AMIPS_jacobian(const std::array<double, 6>& T, Eigen
     double helper_4 = helper_0[3];
     double helper_5 = helper_0[5];
     double helper_6 = helper_0[4];
-    double helper_7 = 1.0/((helper_1 - helper_2)*(0.0005*helper_3 + 0.0005*helper_4 - 0.001*helper_5) - (helper_3 - helper_4)*(0.0005*helper_1 + 0.0005*helper_2 - 0.001*helper_6));
-    double helper_8 = 5.0e-7*helper_6;
-    double helper_9 = 5.0e-7*helper_5;
-    double helper_10 = 0.002*helper_7*(helper_1*(-0.25000025*helper_1 + 0.24999975*helper_2 + helper_8) + helper_2*(0.24999975*helper_1 - 0.25000025*helper_2 + helper_8) + helper_3*(-0.25000025*helper_3 + 0.24999975*helper_4 + helper_9) + helper_4*(0.24999975*helper_3 - 0.25000025*helper_4 + helper_9) + helper_5*(5.0e-7*helper_3 + 5.0e-7*helper_4 - 1.0e-6*helper_5) + helper_6*(5.0e-7*helper_1 + 5.0e-7*helper_2 - 1.0e-6*helper_6));
-    result_0(0) = helper_7*(1.000001*helper_1 + helper_10*(helper_4 - helper_5) - 0.999999*helper_2 - 2.0e-6*helper_6);
-    result_0(1) = -helper_7*(helper_10*(helper_2 - helper_6) - 1.000001*helper_3 + 0.999999*helper_4 + 2.0e-6*helper_5);
+    double helper_7 = 1.0/(1000*(helper_1 - helper_2)*(0.577350269189626*helper_3 + 0.577350269189626*helper_4 - 1.15470053837925*helper_5) - (helper_3 - helper_4)*(577.350269189626*helper_1 + 577.350269189626*helper_2 - 1154.70053837925*helper_6));
+    double helper_8 = 0.666666666666667*helper_5;
+    double helper_9 = 1.33333333333333*helper_5;
+    double helper_10 = 666.666666666667*helper_6;
+    double helper_11 = 1154.70053837925*helper_7*(1000*helper_1*(-1333.33333333333*helper_1 + helper_10 + 666.666666666667*helper_2) + 1000*helper_2*(666.666666666667*helper_1 + helper_10 - 1333.33333333333*helper_2) + helper_3*(-1.33333333333333*helper_3 + 0.666666666666667*helper_4 + helper_8) + helper_4*(0.666666666666667*helper_3 - 1.33333333333333*helper_4 + helper_8) + helper_5*(0.666666666666667*helper_3 + 0.666666666666667*helper_4 - helper_9) + 1000*helper_6*(666.666666666667*helper_1 + 666.666666666667*helper_2 - 1333.33333333333*helper_6));
+    result_0(0) = helper_7*(2666666.66666667*helper_1 + helper_11*(helper_4 - helper_5) - 1333333.33333333*helper_2 - 1333333.33333333*helper_6);
+    result_0(1) = -helper_7*(helper_11*(helper_2 - helper_6) - 2.66666666666667*helper_3 + 1.33333333333333*helper_4 + helper_9);
+
 }
 
 void triwild::optimization::AMIPS_hessian(const std::array<double, 6>& T, Eigen::Matrix2d& result_0){
@@ -134,25 +136,26 @@ void triwild::optimization::AMIPS_hessian(const std::array<double, 6>& T, Eigen:
     double helper_4 = helper_0[3];
     double helper_5 = helper_0[5];
     double helper_6 = helper_0[4];
-    double helper_7 = (helper_1 - helper_2)*(0.0005*helper_3 + 0.0005*helper_4 - 0.001*helper_5) - (helper_3 - helper_4)*(0.0005*helper_1 + 0.0005*helper_2 - 0.001*helper_6);
+    double helper_7 = 1000*(helper_1 - helper_2)*(0.577350269189626*helper_3 + 0.577350269189626*helper_4 - 1.15470053837925*helper_5) - (helper_3 - helper_4)*(577.350269189626*helper_1 + 577.350269189626*helper_2 - 1154.70053837925*helper_6);
     double helper_8 = 1.0/helper_7;
     double helper_9 = helper_4 - helper_5;
-    double helper_10 = 1.0e-6*helper_6;
-    double helper_11 = -0.5000005*helper_1 + helper_10 + 0.4999995*helper_2;
-    double helper_12 = 0.004*helper_8;
-    double helper_13 = pow(helper_7, -2);
-    double helper_14 = 5.0e-7*helper_6;
-    double helper_15 = 5.0e-7*helper_5;
-    double helper_16 = 1.0e-6*helper_5;
-    double helper_17 = helper_1*(-0.25000025*helper_1 + helper_14 + 0.24999975*helper_2) + helper_2*(0.24999975*helper_1 + helper_14 - 0.25000025*helper_2) + helper_3*(helper_15 - 0.25000025*helper_3 + 0.24999975*helper_4) + helper_4*(helper_15 + 0.24999975*helper_3 - 0.25000025*helper_4) + helper_5*(-helper_16 + 5.0e-7*helper_3 + 5.0e-7*helper_4) + helper_6*(5.0e-7*helper_1 - helper_10 + 5.0e-7*helper_2);
-    double helper_18 = 4.0e-6*helper_13*helper_17;
-    double helper_19 = helper_2 - helper_6;
-    double helper_20 = helper_16 - 0.5000005*helper_3 + 0.4999995*helper_4;
-    double helper_21 = helper_13*(-0.002*helper_11*helper_19 + 4.0e-6*helper_17*helper_19*helper_8*helper_9 + 0.002*helper_20*helper_9);
-    result_0(0) = helper_8*(helper_11*helper_12*helper_9 - helper_18*pow(helper_9, 2) + 1.000001);
-    result_0(1) = helper_21;
-    result_0(2) = helper_21;
-    result_0(3) = helper_8*(-helper_12*helper_19*helper_20 - helper_18*pow(helper_19, 2) + 1.000001);
+    double helper_10 = -2666666.66666667*helper_1 + 1333333.33333333*helper_2 + 1333333.33333333*helper_6;
+    double helper_11 = 2309.4010767585*helper_8;
+    double helper_12 = pow(helper_7, -2);
+    double helper_13 = 0.666666666666667*helper_5;
+    double helper_14 = 1.33333333333333*helper_5;
+    double helper_15 = 666.666666666667*helper_6;
+    double helper_16 = 1000*helper_1*(-1333.33333333333*helper_1 + helper_15 + 666.666666666667*helper_2) + 1000*helper_2*(666.666666666667*helper_1 + helper_15 - 1333.33333333333*helper_2) + helper_3*(helper_13 - 1.33333333333333*helper_3 + 0.666666666666667*helper_4) + helper_4*(helper_13 + 0.666666666666667*helper_3 - 1.33333333333333*helper_4) + helper_5*(-helper_14 + 0.666666666666667*helper_3 + 0.666666666666667*helper_4) + 1000*helper_6*(666.666666666667*helper_1 + 666.666666666667*helper_2 - 1333.33333333333*helper_6);
+    double helper_17 = 2666666.66666667*helper_12*helper_16;
+    double helper_18 = helper_2 - helper_6;
+    double helper_19 = helper_14 - 2.66666666666667*helper_3 + 1.33333333333333*helper_4;
+    double helper_20 = helper_12*(-1154.70053837925*helper_10*helper_18 + 2666666.66666667*helper_16*helper_18*helper_8*helper_9 + 1154.70053837925*helper_19*helper_9);
+    result_0(0) = helper_8*(helper_10*helper_11*helper_9 - helper_17*pow(helper_9, 2) + 2666666.66666667);
+    result_0(1) = helper_20;
+    result_0(2) = helper_20;
+    result_0(3) = helper_8*(-helper_11*helper_18*helper_19 - helper_17*pow(helper_18, 2) + 2.66666666666667);
+
+
 }
 
 

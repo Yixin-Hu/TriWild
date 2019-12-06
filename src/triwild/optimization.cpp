@@ -233,7 +233,7 @@ void triwild::optimization::refine(MeshData& mesh, GEO::MeshFacetsAABB &b_tree, 
     double flat_feature_angle = args.flat_feature_angle;
     args.flat_feature_angle *= 0.5;
     operation(mesh, b_tree, std::array<int, 4>({0, 1, 0, 0}));
-//    mesh.is_limit_length = true;
+    mesh.is_limit_length = true;
 
     bool is_just_after_update = false;
     bool is_hit_min_edge_length = false;
