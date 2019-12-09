@@ -23,6 +23,9 @@ namespace triwild {
 
         void sample_features(std::vector<std::vector<Point_2f>>& samples, std::vector<std::vector<double>>& ts);
 
+        void preserve_good_intersection(std::vector<std::vector<double>>& inflections, std::vector<std::vector<Point_2f>>& samples,
+                                        std::vector<std::vector<double>>& ts);
+
         void mu_separation(std::vector<std::vector<double>>& inflections, std::vector<std::vector<Point_2f>>& samples,
                            std::vector<std::vector<double>>& ts);
 

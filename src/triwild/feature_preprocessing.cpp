@@ -73,6 +73,7 @@ void triwild::feature::preprocessing(Eigen::MatrixXd& V, std::vector<std::array<
     for(int i=0;i<2;i++)
         cut_reflex(inflections);
     cout<<"#features = "<<features.size()<<endl<<endl;
+    cout<<inflections.size()<<endl;
 
     ////samples
     cout<<"sample_features"<<endl<<endl;
@@ -83,7 +84,7 @@ void triwild::feature::preprocessing(Eigen::MatrixXd& V, std::vector<std::array<
     if(args.enable_debug_mesh)
         output_features("init");
 
-//    check(inflections, samples, ts);
+    cout<<inflections.size()<<endl;
 
     ////remove high curvature segments
     cout<<"remove_high_curvature"<<endl;
@@ -92,6 +93,7 @@ void triwild::feature::preprocessing(Eigen::MatrixXd& V, std::vector<std::array<
     if(args.enable_debug_mesh)
         output_features("remove_high_curvature");
 
+    cout<<inflections.size()<<endl;
 //    check(inflections, samples, ts);
 
     ////remove short edges
@@ -101,6 +103,7 @@ void triwild::feature::preprocessing(Eigen::MatrixXd& V, std::vector<std::array<
     if(args.enable_debug_mesh)
         output_features("remove_short_features_1");
 
+    cout<<inflections.size()<<endl;
 //    check(inflections, samples, ts);
 
     ////mu separation
@@ -109,9 +112,10 @@ void triwild::feature::preprocessing(Eigen::MatrixXd& V, std::vector<std::array<
     mu_separation(inflections, samples, ts);
     cout<<igl_timer.getElapsedTime()<<"s"<<endl;
     cout<<"#features = "<<features.size()<<endl<<endl;
-    if(args.enable_debug_mesh)
+//    if(args.enable_debug_mesh)
         output_features("mu_separation");
 
+    cout<<inflections.size()<<endl;
 //    check(inflections, samples, ts);
 
     ////cut inflections
@@ -119,7 +123,8 @@ void triwild::feature::preprocessing(Eigen::MatrixXd& V, std::vector<std::array<
     cut_inflections(inflections, samples, ts);
     cout<<"#features = "<<features.size()<<endl<<endl;
 
-//    check(inflections, samples, ts);
+    cout<<inflections.size()<<endl;
+    check(inflections, samples, ts);
 
     ////remove short edges again
     cout<<"remove_short_features again"<<endl;
@@ -136,7 +141,7 @@ void triwild::feature::preprocessing(Eigen::MatrixXd& V, std::vector<std::array<
 
 //    check(inflections, samples, ts);
 
-    if(args.enable_debug_mesh){
+//    if(args.enable_debug_mesh){
         output_input_features(features, V, edges, "final");
 //        output_input_features(secondary_features, V, edges, "final_secondary");
         Eigen::MatrixXd V_out(V.rows(), 3);
@@ -147,8 +152,8 @@ void triwild::feature::preprocessing(Eigen::MatrixXd& V, std::vector<std::array<
             E_out.row(i) << edges[i][0], edges[i][1], edges[i][1];
         }
         igl::writeSTL(args.output + "_final_all.stl", V_out, E_out);
-    }
-//    optimization::pausee();
+//    }
+    optimization::pausee();
 }
 
 void triwild::feature::simplify(){
@@ -184,12 +189,12 @@ void triwild::feature::get_inflections(std::vector<std::vector<double>>& inflect
 
     for (int i = 0; i < features.size(); i++) {
         inflections[i] = features[i]->inflection_points(features[i]->paras.front(), features[i]->paras.back());
-        if(inflections[i].empty())
+        if (inflections[i].empty())
             continue;
         std::sort(inflections[i].begin(), inflections[i].end());
-        if (inflections[i].front() == 0)
+        if (std::abs(inflections[i].front() - 0) < 1e-8)
             inflections[i].erase(inflections[i].begin());
-        if (inflections[i].back() == 1)
+        if (std::abs(inflections[i].back() - 1) < 1e-8)
             inflections[i].erase(inflections[i].begin() + inflections[i].size() - 1);
     }
 }
@@ -260,7 +265,7 @@ void triwild::feature::cut_reflex(std::vector<std::vector<double>>& inflections)
 
 void triwild::feature::sample_features(std::vector<std::vector<Point_2f>>& samples, std::vector<std::vector<double>>& ts){
     ///sampling
-    double dd = args.min_edge_length * args.target_edge_len;
+    double dd = args.min_edge_length * args.target_edge_len;//should be <2*mu
     double dd_2 = dd * dd;
 
     samples.resize(features.size());
@@ -330,6 +335,115 @@ void triwild::feature::remove_short_features(std::vector<std::vector<double>>& i
         }
     }
     cout << cnt << " short edges are removed" << endl;
+}
+
+void triwild::feature::preserve_good_intersection(std::vector<std::vector<double>>& inflections, std::vector<std::vector<Point_2f>>& samples,
+                                std::vector<std::vector<double>>& ts){
+    ///get pairs
+    aabb::Tree aabbcc_tree(2, 0, features.size(), true);
+    std::vector<double> min_corner(2), max_corner(2);
+    for (int i = 0; i < features.size(); i++) {
+        Point_2f min, max;
+        for (int j = 0; j < samples[i].size(); j++) {
+            if (j == 0 || samples[i][j].x < min.x)
+                min.x = samples[i][j].x;
+            if (j == 0 || samples[i][j].x > max.x)
+                max.x = samples[i][j].x;
+            if (j == 0 || samples[i][j].y < min.y)
+                min.y = samples[i][j].y;
+            if (j == 0 || samples[i][j].y > max.y)
+                max.y = samples[i][j].y;
+        }
+        min_corner[0] = min.x;
+        min_corner[1] = min.y;
+        max_corner[0] = max.x;
+        max_corner[1] = max.y;
+        aabbcc_tree.insertParticle(i, min_corner, max_corner);
+    }
+    std::vector<std::array<int, 2>> feature_pairs;
+    for (int i = 0; i < features.size(); i++) {
+        auto boxes = aabbcc_tree.query(i);
+        for (auto &id: boxes) {
+            if (samples[i].size() > samples[id].size()
+                || (samples[i].size() == samples[id].size() && i > id))
+                feature_pairs.push_back({{i, (int) id}});
+        }
+    }
+    cout << "#pairs = " << feature_pairs.size() << endl;
+
+    std::vector<std::vector<double>> split_at_us(features.size());
+//    for(int i=0;i<features.size();i++)
+//        split_at_us[i] = {features[i]->paras.front(), features[i]->paras.back()};
+    for(auto& ids: feature_pairs) {
+        int feature1_id = ids[0];
+        int feature2_id = ids[1];
+
+        for (int i = 0; i < samples[feature1_id].size() - 1; i++) {
+            std::array<Point_2f, 2> seg1 = {{samples[feature1_id][i], samples[feature1_id][i + 1]}};
+            Point_2f min1, max1;
+            min1.x = std::min(seg1[0].x, seg1[1].x);
+            min1.y = std::min(seg1[0].y, seg1[1].y);
+            max1.x = std::max(seg1[0].x, seg1[1].x);
+            max1.y = std::max(seg1[0].y, seg1[1].y);
+
+            for (int j = 0; j < samples[feature2_id].size() - 1; j++) {
+                std::array<Point_2f, 2> seg2 = {{samples[feature2_id][j], samples[feature2_id][j + 1]}};
+                if ((min1.x > seg2[0].x && min1.x > seg2[1].x) || (min1.y > seg2[0].y && min1.y > seg2[1].y)
+                    || (max1.x < seg2[0].x && max1.x < seg2[1].x) || (max1.y < seg2[0].y && max1.y < seg2[1].y))
+                    continue;
+
+                double u1, u2;
+                //todo: compute intersection
+
+                split_at_us[feature1_id].push_back(u1);
+                split_at_us[feature2_id].push_back(u2);
+            }
+        }
+    }
+    for(auto& us: split_at_us){
+        if(!us.empty())
+            std::sort(us.begin(), us.end());
+    }
+    //todo: combine super close split us
+
+    ///split features
+    const int features_size = features.size();
+    for (int i = 0; i < features_size; i++) {
+        if(split_at_us[i].empty())
+            continue;
+
+        std::vector<int> ranges = {0};//local ids of samples
+        //todo
+        ranges.push_back(samples.size()-1);
+        assert(ranges.size() % 2 == 0);
+
+//        auto old_inflection = inflections[i];
+//        for (int j = 0; j < ranges.size(); j += 2) {
+//            if (j == ranges.size() - 2) {
+//                features[i]->paras = {ts[i][ranges[j]], ts[i][ranges[j + 1]]};
+//                samples[i] = std::vector<Point_2f>(samples[i].begin() + ranges[j],
+//                                                   samples[i].begin() + ranges[j + 1] + 1);
+//                ts[i] = std::vector<double>(ts[i].begin() + ranges[j], ts[i].begin() + ranges[j + 1] + 1);
+//                std::vector<double> new_inflection;
+//                for (double infl: old_inflection) {
+//                    if (infl > ts[i][ranges[j]] && infl < ts[i][ranges[j + 1]])
+//                        new_inflection.push_back(infl);
+//                }
+//                inflections[i] = new_inflection;
+//            } else {
+//                int new_feature_id = push_back_new_feature(features[i]);
+//                features[new_feature_id]->paras = {ts[i][ranges[j]], ts[i][ranges[j + 1]]};
+//                samples.push_back(
+//                        std::vector<Point_2f>(samples[i].begin() + ranges[j], samples[i].begin() + ranges[j + 1] + 1));
+//                ts.push_back(std::vector<double>(ts[i].begin() + ranges[j], ts[i].begin() + ranges[j + 1] + 1));
+//                inflections.emplace_back();
+//                for (double infl: old_inflection) {
+//                    if (infl > ts[i][ranges[j]] && infl < ts[i][ranges[j + 1]])
+//                        inflections.back().push_back(infl);
+//                }
+//            }
+//        }
+    }
 }
 
 void triwild::feature::mu_separation(std::vector<std::vector<double>>& inflections, std::vector<std::vector<Point_2f>>& samples,
@@ -743,6 +857,32 @@ void triwild::feature::mu_separation(std::vector<std::vector<double>>& inflectio
             secondary_features[new_feature_id]->paras = {ts[i][removed_ranges[j]], ts[i][removed_ranges[j + 1]]};
         }
 
+//        for (int j = 0; j < ranges.size(); j += 2) {
+//            if (j == ranges.size() - 2) {
+//                features[i]->paras = {ts[i][ranges[j]], ts[i][ranges[j + 1]]};
+//                samples[i] = std::vector<Point_2f>(samples[i].begin() + ranges[j],
+//                                                   samples[i].begin() + ranges[j + 1] + 1);
+//                ts[i] = std::vector<double>(ts[i].begin() + ranges[j], ts[i].begin() + ranges[j + 1] + 1);
+//                std::vector<double> new_inflection;
+//                for (int infl: inflections[i]) {
+//                    if (infl > ranges[j] && infl < ranges[j + 1])
+//                        new_inflection.push_back(infl);
+//                }
+//                inflections[i] = new_inflection;
+//            } else {
+//                int new_feature_id = push_back_new_feature(features[i]);
+//                features[new_feature_id]->paras = {ts[i][ranges[j]], ts[i][ranges[j + 1]]};
+//                samples.push_back(
+//                        std::vector<Point_2f>(samples[i].begin() + ranges[j], samples[i].begin() + ranges[j + 1] + 1));
+//                ts.push_back(std::vector<double>(ts[i].begin() + ranges[j], ts[i].begin() + ranges[j + 1] + 1));
+//                inflections.emplace_back();
+//                for (int infl: inflections[i]) {
+//                    if (infl > ranges[j] && infl < ranges[j + 1])
+//                        inflections.back().push_back(infl);
+//                }
+//            }
+//        }
+        auto old_inflection = inflections[i];
         for (int j = 0; j < ranges.size(); j += 2) {
             if (j == ranges.size() - 2) {
                 features[i]->paras = {ts[i][ranges[j]], ts[i][ranges[j + 1]]};
@@ -750,8 +890,8 @@ void triwild::feature::mu_separation(std::vector<std::vector<double>>& inflectio
                                                    samples[i].begin() + ranges[j + 1] + 1);
                 ts[i] = std::vector<double>(ts[i].begin() + ranges[j], ts[i].begin() + ranges[j + 1] + 1);
                 std::vector<double> new_inflection;
-                for (int infl: inflections[i]) {
-                    if (infl > ranges[j] && infl < ranges[j + 1])
+                for (double infl: old_inflection) {
+                    if (infl > ts[i][ranges[j]] && infl < ts[i][ranges[j + 1]])
                         new_inflection.push_back(infl);
                 }
                 inflections[i] = new_inflection;
@@ -762,8 +902,8 @@ void triwild::feature::mu_separation(std::vector<std::vector<double>>& inflectio
                         std::vector<Point_2f>(samples[i].begin() + ranges[j], samples[i].begin() + ranges[j + 1] + 1));
                 ts.push_back(std::vector<double>(ts[i].begin() + ranges[j], ts[i].begin() + ranges[j + 1] + 1));
                 inflections.emplace_back();
-                for (int infl: inflections[i]) {
-                    if (infl > ranges[j] && infl < ranges[j + 1])
+                for (double infl: old_inflection) {
+                    if (infl > ts[i][ranges[j]] && infl < ts[i][ranges[j + 1]])
                         inflections.back().push_back(infl);
                 }
             }
@@ -874,32 +1014,60 @@ void triwild::feature::remove_high_curvature(std::vector<std::vector<double>>& i
             secondary_features[new_feature_id]->paras = {ts[feature_id][removed_ranges[j]], ts[feature_id][removed_ranges[j + 1]]};
         }
 
+//        for (int j = 0; j < ranges.size(); j += 2) {
+//            if (j == ranges.size() - 2) {
+//                features[feature_id]->paras = {ts[feature_id][ranges[j]], ts[feature_id][ranges[j + 1]]};
+//                samples[feature_id] = std::vector<Point_2f>(samples[feature_id].begin() + ranges[j],
+//                                                            samples[feature_id].begin() + ranges[j + 1] + 1);
+//                ts[feature_id] = std::vector<double>(ts[feature_id].begin() + ranges[j],
+//                                                     ts[feature_id].begin() + ranges[j + 1] + 1);
+//                std::vector<double> new_inflection;
+//                for (int infl: inflections[feature_id]) {
+//                    if (infl > ranges[j] && infl < ranges[j + 1])
+//                        new_inflection.push_back(infl);
+//                }
+//                inflections[feature_id] = new_inflection;
+//            } else {
+//                int new_feature_id = push_back_new_feature(features[feature_id]);
+//                features[new_feature_id]->paras = {ts[feature_id][ranges[j]], ts[feature_id][ranges[j + 1]]};
+//                samples.push_back(
+//                        std::vector<Point_2f>(samples[feature_id].begin() + ranges[j],
+//                                              samples[feature_id].begin() + ranges[j + 1] + 1));
+//                ts.push_back(std::vector<double>(ts[feature_id].begin() + ranges[j],
+//                                                 ts[feature_id].begin() + ranges[j + 1] + 1));
+//                inflections.emplace_back();
+//                for (int infl: inflections[feature_id]) {
+//                    if (infl > ranges[j] && infl < ranges[j + 1])
+//                        inflections.back().push_back(infl);
+//                    //todo: infl == ranges[j]
+//                }
+//            }
+//        }
+
+        int i = feature_id;
+        auto old_inflection = inflections[i];
         for (int j = 0; j < ranges.size(); j += 2) {
             if (j == ranges.size() - 2) {
-                features[feature_id]->paras = {ts[feature_id][ranges[j]], ts[feature_id][ranges[j + 1]]};
-                samples[feature_id] = std::vector<Point_2f>(samples[feature_id].begin() + ranges[j],
-                                                            samples[feature_id].begin() + ranges[j + 1] + 1);
-                ts[feature_id] = std::vector<double>(ts[feature_id].begin() + ranges[j],
-                                                     ts[feature_id].begin() + ranges[j + 1] + 1);
+                features[i]->paras = {ts[i][ranges[j]], ts[i][ranges[j + 1]]};
+                samples[i] = std::vector<Point_2f>(samples[i].begin() + ranges[j],
+                                                   samples[i].begin() + ranges[j + 1] + 1);
+                ts[i] = std::vector<double>(ts[i].begin() + ranges[j], ts[i].begin() + ranges[j + 1] + 1);
                 std::vector<double> new_inflection;
-                for (int infl: inflections[feature_id]) {
-                    if (infl > ranges[j] && infl < ranges[j + 1])
+                for (double infl: old_inflection) {
+                    if (infl > ts[i][ranges[j]] && infl < ts[i][ranges[j + 1]])
                         new_inflection.push_back(infl);
                 }
-                inflections[feature_id] = new_inflection;
+                inflections[i] = new_inflection;
             } else {
-                int new_feature_id = push_back_new_feature(features[feature_id]);
-                features[new_feature_id]->paras = {ts[feature_id][ranges[j]], ts[feature_id][ranges[j + 1]]};
+                int new_feature_id = push_back_new_feature(features[i]);
+                features[new_feature_id]->paras = {ts[i][ranges[j]], ts[i][ranges[j + 1]]};
                 samples.push_back(
-                        std::vector<Point_2f>(samples[feature_id].begin() + ranges[j],
-                                              samples[feature_id].begin() + ranges[j + 1] + 1));
-                ts.push_back(std::vector<double>(ts[feature_id].begin() + ranges[j],
-                                                 ts[feature_id].begin() + ranges[j + 1] + 1));
+                        std::vector<Point_2f>(samples[i].begin() + ranges[j], samples[i].begin() + ranges[j + 1] + 1));
+                ts.push_back(std::vector<double>(ts[i].begin() + ranges[j], ts[i].begin() + ranges[j + 1] + 1));
                 inflections.emplace_back();
-                for (int infl: inflections[feature_id]) {
-                    if (infl > ranges[j] && infl < ranges[j + 1])
+                for (double infl: old_inflection) {
+                    if (infl > ts[i][ranges[j]] && infl < ts[i][ranges[j + 1]])
                         inflections.back().push_back(infl);
-                    //todo: infl == ranges[j]
                 }
             }
         }
@@ -914,6 +1082,13 @@ void triwild::feature::cut_inflections(std::vector<std::vector<double>>& inflect
     for (int feature_id = 0; feature_id < features_size; feature_id++) {
         if (inflections[feature_id].empty())
             continue;
+
+        cout<<"cutting feature "<<feature_id<<endl;
+        cout<<"#infl = "<<inflections[feature_id].size()<<endl;
+        for(double infl: inflections[feature_id])
+            cout<<infl<<endl;
+        cout<<features[feature_id]->paras.front()<<", "<<features[feature_id]->paras.back()<<endl;
+
 
         int cnt = 0;
         std::vector<int> ranges;
@@ -945,6 +1120,7 @@ void triwild::feature::cut_inflections(std::vector<std::vector<double>>& inflect
         if(ranges.back()!=ts[feature_id].size()-1)
             ranges.push_back(ts[feature_id].size()-1);
 
+//        auto& old_inflection = inflections[feature_id];
         for (int j = 0; j < ranges.size() - 1; j++) {
             if (j == ranges.size() - 2) {
                 features[feature_id]->paras = {ts[feature_id][ranges[j]], ts[feature_id][ranges[j + 1]]};
@@ -953,7 +1129,7 @@ void triwild::feature::cut_inflections(std::vector<std::vector<double>>& inflect
                 ts[feature_id] = std::vector<double>(ts[feature_id].begin() + ranges[j],
                                                      ts[feature_id].begin() + ranges[j + 1] + 1);
 
-                inflections.clear();
+                inflections[feature_id].clear();
                 features[feature_id]->is_inflection = {true, false};
             } else {
                 int new_feature_id = push_back_new_feature(features[feature_id]);
@@ -1176,6 +1352,14 @@ void triwild::feature::output_features(const std::string& name) {
 
 void triwild::feature::check(std::vector<std::vector<double>>& inflections, std::vector<std::vector<Point_2f>>& samples,
            std::vector<std::vector<double>>& ts){
+    if(inflections.size()!=features.size()){
+        cout<<"inflections.size()!=features.size()"<<endl;
+        cout<<features.size()<<endl;
+        cout<<inflections.size()<<endl;
+        cout<<samples.size()<<endl;
+        cout<<ts.size()<<endl;
+        optimization::pausee();
+    }
     for(int i=0;i<features.size();i++) {
         if (samples[i].size() < 2) {
             cout << "feature " << i << " samples[i].size()<2 " << endl;
